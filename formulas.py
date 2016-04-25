@@ -12,7 +12,7 @@ def group(iter, key_func):
 # T - type, component, synthfun, parameter, execution, copy, value
 # I, O - type, synthfun, 
 
-def create_wfp_constraint(L, card_I, M):
+def create_wfp_constraint(L, card_I, N):
 	constraints = []
 	# consistency constraint
 	return_locations = [l.value for l in L if l.type == "return"]
@@ -26,10 +26,10 @@ def create_wfp_constraint(L, card_I, M):
 	# parameter interpretation
 	for output in [l.value for l in L if l.type == "return"]:
 		constraints.append(card_I <= output)
-		constraints.append(output <= M)
+		constraints.append(output < (N + card_I))
 	for parameter in [l.value for l in L if l.type == "parameter"]:
 		constraints.append(0 <= parameter)
-		constraints.append(parameter <= M)
+		constraints.append(parameter < (N + card_I))
 	return And(constraints)
 
 def create_lib_constraint(T, I, components):

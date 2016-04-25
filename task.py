@@ -2,7 +2,7 @@ from scope import Scope, get_sort
 from symbols import mapping
 from components import *
 from formulas import *
-from z3 import Solver, unsat, Not, And, Const, IntSort
+from z3 import Solver, unsat, Not, And, Const, IntSort, simplify
 from setup import DEBUG, MAX_BREADTH
 from pprint import pprint
 from variables import *
@@ -69,6 +69,8 @@ class Task(object):
 	def synthesize_with_components(self, components, constraint):
 		# components maps unique comp_ids to component objects
 		# not one-to-one, but def. onto
+		# step 0: some useful values
+		card_I, N = len(self.synth_function.parameters), len(components)
 		# step 1: make some solvers
 		synth_solver = Solver()
 		verify_solver = Solver()
@@ -77,10 +79,11 @@ class Task(object):
 		# step 3: looooooooop
 		while True:
 			if DEBUG: print("Looking for a model...")
+			if DEBUG: print([[x.value.sexpr() for x in xs] for xs in S])
 			# step 4: create location variables off component list
 			L = create_location_variables(components)
 			# step 5: assert wfp constraint
-			wfp = create_wfp_constraint(L, len(self.synth_function.parameters), len(components))
+			wfp = create_wfp_constraint(L, card_I, N)
 			synth_solver.assert_exprs(wfp)
 			if DEBUG:
 				print("WFP:")
@@ -95,7 +98,7 @@ class Task(object):
 					# step 7: assert library and connection constraints
 					lib = create_lib_constraint(T_w, I_w, components)
 					# for conn constraint, need map from component_id to l value
-					locations = create_location_map(I_w, O_w, T_w, L)
+					locations = create_location_map(I_w, O_w, T_w, L, card_I, N)
 					conn = create_conn_constraint(I_w, O_w, T_w, locations)
 					synth_solver.assert_exprs(lib, conn)
 					if DEBUG:
@@ -103,15 +106,16 @@ class Task(object):
 						print(lib.sexpr())
 						print("CONN:")
 						print(conn.sexpr())
+						pass
 					I += I_w
 					O += O_w
 					T += T_w
 				# step 8: once we've got all the I, O, we can assert the spec constraint
-				spec = create_spec_constraint(I, O, X, constraint)
+				conn_spec, spec = create_spec_constraint(I, O, X, constraint)
 				if DEBUG:
 					print("SPEC:")
 					print(spec.sexpr())
-				synth_solver.assert_exprs(spec)
+				synth_solver.assert_exprs(conn_spec, spec)
 			# get a model, or just bail
 			if synth_solver.check() == unsat:
 				if DEBUG: print("Failed to find a model.")
@@ -120,8 +124,7 @@ class Task(object):
 			curr_l = [l._replace(value=model[l.value]) for l in L]
 			if DEBUG:
 				print("Found model:")
-				for l in curr_l:
-					print(l.value.sexpr())
+				#construct_program_from_linearization(curr_l, self.synth_function, components)
 			# step 9: need to verify the model we just found, so we'll construct verificatio constraint
 			I, O, T = [], [], []
 			for w in range(constraint.width):
@@ -130,7 +133,7 @@ class Task(object):
 				O_w = create_output_variables(self.synth_function.output, 0, w)
 				T_w = create_temp_variables(components, 0, w)
 				lib = create_lib_constraint(T_w, I_w, components)
-				locations = create_location_map(I_w, O_w, T_w, curr_l)
+				locations = create_location_map(I_w, O_w, T_w, curr_l, card_I, N)
 				conn = create_conn_constraint(I_w, O_w, T_w, locations)
 				verify_solver.assert_exprs(lib, conn)
 				I += I_w
@@ -138,8 +141,8 @@ class Task(object):
 				T += T_w
 			# now we need to create variables for X so we can check our spec
 			X = create_spec_variables(constraint, self.variables)
-			spec = create_spec_constraint(I, O, X, constraint)
-			verify_solver.assert_exprs(Not(spec))
+			conn_spec, spec = create_spec_constraint(I, O, X, constraint)
+			verify_solver.assert_exprs(conn_spec, Not(spec))
 			# now we'll try and get a model of our exectution
 			if verify_solver.check() == unsat:
 				if DEBUG: print("Found a solution!")
@@ -148,9 +151,8 @@ class Task(object):
 			example = [x._replace(value=model[x.value]) for x in X]
 			if DEBUG:
 				print("Found counter-example:")
-				for x in example:
-					print(x.value.sexpr())
-			S.append(X)
+				print(model.sexpr())
+			S.append(example)
 			# clear synthesizers and start anew
 			synth_solver.reset()
 			verify_solver.reset()

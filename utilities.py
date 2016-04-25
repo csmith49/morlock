@@ -42,6 +42,10 @@ def dict_params_with(params, li):
 		output[ps[0]] = i
 	return output
 
+def find_in_list(li, key_func):
+	intermediate = [l for l in li if key_func(l)]
+	return intermediate[0]
+
 def unique(iterable, key=None):
     seen = set()
     seen_add = seen.add

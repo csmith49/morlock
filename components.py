@@ -78,6 +78,7 @@ class Constraint(object):
 			self.input += unique(filter_sexpr(c, lambda s: s in self.variables.keys()))
 	def __call__(self, X, args):
 		constraints = []
+		conn_constraints = []
 		# first, we'll update scope
 		variables = {}
 		for x in X:
@@ -101,11 +102,11 @@ class Constraint(object):
 						params, out = data.pop()
 						left.append(out)
 						for p, a in zip(params, args):
-							constraints.append(p == a)
+							conn_constraints.append(p == a)
 					else:
 						op = scope[cur]
 						left.append( op(*args) )
 				else:
 					left.append( scope[cur] )
 			constraints.append(left[0])
-		return And(constraints)
+		return And(conn_constraints), And(constraints)
