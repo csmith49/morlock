@@ -57,6 +57,15 @@ class Component(object):
 		return evaluate_in_scope(self.sexpr, scope.update(arguments))
 	def __repr__(self):
 		return repr(self.sexpr)
+	def eval_as_sexpr(self, args):
+		fresh = []
+		for s, a in linearize_sexpr(self.sexpr):
+			try:
+				sub_sexpr = args[s]
+				fresh.append( (sub_sexpr, 0) )
+			except:
+				fresh.append( (s, a) )
+		return reconstruct_linearization(fresh)
 
 class Variable(object):
 	def __init__(self, name, sort):

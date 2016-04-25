@@ -8,12 +8,13 @@ from pprint import pprint
 from variables import *
 
 class Task(object):
-	def __init__(self, sexpr):
+	def __init__(self):
 		# all the appropriate scopes
 		self.functions = Scope()
 		self.synth_function = None
 		self.variables = Scope()
 		self.constraints = []
+	def parse(self, sexpr):
 		# now let's process the file
 		for cmd, *args in sexpr:
 			if cmd == "set-logic":
@@ -31,7 +32,7 @@ class Task(object):
 			elif cmd == "constraint":
 				self.constraints.append(args[0])
 			elif cmd == "check-synth":
-				self.synthesize()
+				return self.synthesize()
 			else:
 				pass
 	def synthesize(self):
@@ -62,7 +63,7 @@ class Task(object):
 			solution = self.synthesize_with_components(components, constraint)
 			if solution:
 				if DEBUG: print("Found solution.")
-				return solution
+				return self.extract_program(solution, components)
 			else:
 				if DEBUG: print("No solution at that size.")
 				breadth += 1
@@ -78,16 +79,11 @@ class Task(object):
 		S = []
 		# step 3: looooooooop
 		while True:
-			if DEBUG: print("Looking for a model...")
-			if DEBUG: print([[x.value.sexpr() for x in xs] for xs in S])
 			# step 4: create location variables off component list
 			L = create_location_variables(components)
 			# step 5: assert wfp constraint
 			wfp = create_wfp_constraint(L, card_I, N)
 			synth_solver.assert_exprs(wfp)
-			if DEBUG:
-				print("WFP:")
-				print(wfp.sexpr())
 			for i, X in enumerate(S):
 				I, O, T = [], [], []
 				for w in range(constraint.width):
@@ -101,20 +97,11 @@ class Task(object):
 					locations = create_location_map(I_w, O_w, T_w, L, card_I, N)
 					conn = create_conn_constraint(I_w, O_w, T_w, locations)
 					synth_solver.assert_exprs(lib, conn)
-					if DEBUG:
-						print("LIB:")
-						print(lib.sexpr())
-						print("CONN:")
-						print(conn.sexpr())
-						pass
 					I += I_w
 					O += O_w
 					T += T_w
 				# step 8: once we've got all the I, O, we can assert the spec constraint
 				conn_spec, spec = create_spec_constraint(I, O, X, constraint)
-				if DEBUG:
-					print("SPEC:")
-					print(spec.sexpr())
 				synth_solver.assert_exprs(conn_spec, spec)
 			# get a model, or just bail
 			if synth_solver.check() == unsat:
@@ -122,9 +109,7 @@ class Task(object):
 				return None
 			model = synth_solver.model()
 			curr_l = [l._replace(value=model[l.value]) for l in L]
-			if DEBUG:
-				print("Found model:")
-				#construct_program_from_linearization(curr_l, self.synth_function, components)
+
 			# step 9: need to verify the model we just found, so we'll construct verificatio constraint
 			I, O, T = [], [], []
 			for w in range(constraint.width):
@@ -145,17 +130,42 @@ class Task(object):
 			verify_solver.assert_exprs(conn_spec, Not(spec))
 			# now we'll try and get a model of our exectution
 			if verify_solver.check() == unsat:
-				if DEBUG: print("Found a solution!")
 				return curr_l
 			model = verify_solver.model()
 			example = [x._replace(value=model[x.value]) for x in X]
-			if DEBUG:
-				print("Found counter-example:")
-				print(model.sexpr())
 			S.append(example)
 			# clear synthesizers and start anew
 			synth_solver.reset()
 			verify_solver.reset()
-
 		return None
+	def extract_program(self, L, components):
+		card_I = len(self.synth_function.parameters)
+		N = len(components)
+		# we need to work our way back through the program, all the way to the params
+		worklist = [card_I + N - 1]
+		components_used = []
+		# pick up all the components used, and in which order
+		while worklist:
+			cur = worklist.pop()
+			if cur < card_I:
+				components_used.append(self.synth_function.parameters[cur][0])
+			else:
+				source = [l for l in L if l.value.as_long() == cur and l.type == "return"][0]
+				for p, s in components[source.component].parameters:
+					k = [l for l in L if l.component == source.component and l.parameter == p][0]
+					worklist.append(k.value.as_long())
+				components_used.append(components[source.component])
+		left = []
+		while components_used:
+			cur = components_used.pop()
+			if isinstance(cur, Component):
+				arity = len(cur.parameters)
+				args = {}
+				for i in range(arity):
+					args["PARAM.{}".format(i)] = left.pop()
+				left.append(cur.eval_as_sexpr(args))
+			else:
+				left.append(cur)
+		return ['define-fun', self.synth_function.name, self.synth_function.parameters, left[0]]
+
 	

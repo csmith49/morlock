@@ -15,10 +15,7 @@ if __name__ == "__main__":
 	# set number of copies of each component to use
 	breadth = 1
 	# we'll be using two solvers
-	t = Task(task)
-	# main loop
-	while True:
-		break
-
-	# display total time
+	t = Task()
+	# get a solution
+	pprint(t.parse(task))
 	print("Ran for {} seconds".format(clock() - start_time))
