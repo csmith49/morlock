@@ -14,6 +14,9 @@ class Task(object):
 		self.synth_function = None
 		self.variables = Scope()
 		self.constraints = []
+		self.system = None
+	def add_system(self, s):
+		self.system = s
 	def parse(self, sexpr):
 		# now let's process the file
 		for cmd, *args in sexpr:
@@ -60,14 +63,15 @@ class Task(object):
 				print("Starting synthesis with breadth {}...".format(breadth))
 				print("Components map:")
 				pprint(components)
-			solution = self.synthesize_with_components(components, constraint)
+			# now actually synthesize
+			solution = self.synthesize_with_components(components, constraint, self.system)
 			if solution:
 				if DEBUG: print("Found solution.")
 				return self.extract_program(solution, components)
 			else:
 				if DEBUG: print("No solution at that size.")
 				breadth += 1
-	def synthesize_with_components(self, components, constraint):
+	def synthesize_with_components(self, components, constraint, system):
 		# components maps unique comp_ids to component objects
 		# not one-to-one, but def. onto
 		# step 0: some useful values
@@ -77,13 +81,22 @@ class Task(object):
 		verify_solver = Solver()
 		# step 2: initialize examples
 		S = []
+		# step 2b: create location variables and location constraints
+		initial_constraints = []
+		L = create_location_variables(components)
+		if system:
+			patterns = create_pattern_constraint(L, components, system)
+			if DEBUG:
+				print("PATTERNS")
+				print(patterns.sexpr())
+			initial_constraints.append(patterns)
+		wfp = create_wfp_constraint(L, card_I, N)
+		initial_constraints.append(wfp)
 		# step 3: looooooooop
 		while True:
-			# step 4: create location variables off component list
-			L = create_location_variables(components)
-			# step 5: assert wfp constraint
-			wfp = create_wfp_constraint(L, card_I, N)
-			synth_solver.assert_exprs(wfp)
+			# step 4: assert L constraint
+			synth_solver.assert_exprs(*initial_constraints)
+			# step 5: start the looooop
 			for i, X in enumerate(S):
 				I, O, T = [], [], []
 				for w in range(constraint.width):

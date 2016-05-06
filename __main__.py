@@ -1,7 +1,8 @@
 from time import clock
 from pprint import pprint
-from setup import DEBUG, FILENAME, load_file
+from setup import DEBUG, FILENAME, load_file, EQ_FILENAME
 from task import Task
+from equations import System
 
 if __name__ == "__main__":
 	# record starting time for bm purposes
@@ -16,6 +17,10 @@ if __name__ == "__main__":
 	breadth = 1
 	# we'll be using two solvers
 	t = Task()
+	if EQ_FILENAME:
+		system = load_file(EQ_FILENAME)[0]
+		s = System(system)
+		t.add_system(s)
 	# get a solution
 	pprint(t.parse(task))
 	print("Ran for {} seconds".format(clock() - start_time))

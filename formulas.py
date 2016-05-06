@@ -8,9 +8,6 @@ def group(iter, key_func):
 	for value in iter:
 		result[key_func(value)].append(value)
 	return result
-# L - type, component, param, value
-# T - type, component, synthfun, parameter, execution, copy, value
-# I, O - type, synthfun, 
 
 def create_wfp_constraint(L, card_I, N):
 	constraints = []
@@ -61,3 +58,10 @@ def create_spec_constraint(I, O, X, constraint):
 	for _, variables in group(I, lambda v: v.width).items():
 		params.append( [v.value for v in variables] )
 	return constraint(X, list(zip(params, outputs)))
+
+def create_pattern_constraint(L, components, system):
+	constraints = []
+	for l, _ in system.rules:
+		for p in system._invert(l, components):
+			constraints.append(Not(system._pattern(p, L)))
+	return And(constraints)
