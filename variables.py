@@ -52,11 +52,9 @@ def create_spec_variables(constraint, variables):
 		X.append( Spec(p, Const(x_id, get_sort(variables[p].sort))) )
 	return X
 
-def create_location_map(I, O, T, L, card_I, N):
+def create_location_map(O, T, L, N):
 	locations = {}
-	for index, i in enumerate(I):
-		locations[i] = index
-	locations[O[0]] = card_I + N - 1
+	locations[O[0]] = N - 1
 	for t in T:
 		locations[t] = [l.value for l in L if l.component == t.component and l.parameter == t.parameter][0]
 	return locations

@@ -90,7 +90,7 @@ class Task(object):
 				print("PATTERNS")
 				print(patterns.sexpr())
 			initial_constraints.append(patterns)
-		wfp = create_wfp_constraint(L, card_I, N)
+		wfp = create_wfp_constraint(L, N)
 		initial_constraints.append(wfp)
 		# step 3: looooooooop
 		while True:
@@ -107,8 +107,8 @@ class Task(object):
 					# step 7: assert library and connection constraints
 					lib = create_lib_constraint(T_w, I_w, components)
 					# for conn constraint, need map from component_id to l value
-					locations = create_location_map(I_w, O_w, T_w, L, card_I, N)
-					conn = create_conn_constraint(I_w, O_w, T_w, locations)
+					locations = create_location_map(O_w, T_w, L, N)
+					conn = create_conn_constraint(O_w, T_w, locations)
 					synth_solver.assert_exprs(lib, conn)
 					I += I_w
 					O += O_w
@@ -131,8 +131,8 @@ class Task(object):
 				O_w = create_output_variables(self.synth_function.output, 0, w)
 				T_w = create_temp_variables(components, 0, w)
 				lib = create_lib_constraint(T_w, I_w, components)
-				locations = create_location_map(I_w, O_w, T_w, curr_l, card_I, N)
-				conn = create_conn_constraint(I_w, O_w, T_w, locations)
+				locations = create_location_map(O_w, T_w, curr_l, N)
+				conn = create_conn_constraint(O_w, T_w, locations)
 				verify_solver.assert_exprs(lib, conn)
 				I += I_w
 				O += O_w
@@ -147,27 +147,25 @@ class Task(object):
 			model = verify_solver.model()
 			example = [x._replace(value=model[x.value]) for x in X]
 			S.append(example)
+			if DEBUG:
+				print("Found bad solution: ", [l.value.sexpr() for l in curr_l])
 			# clear synthesizers and start anew
 			synth_solver.reset()
 			verify_solver.reset()
 		return None
 	def extract_program(self, L, components):
-		card_I = len(self.synth_function.parameters)
 		N = len(components)
 		# we need to work our way back through the program, all the way to the params
-		worklist = [card_I + N - 1]
+		worklist = [N - 1]
 		components_used = []
 		# pick up all the components used, and in which order
 		while worklist:
 			cur = worklist.pop()
-			if cur < card_I:
-				components_used.append(self.synth_function.parameters[cur][0])
-			else:
-				source = [l for l in L if l.value.as_long() == cur and l.type == "return"][0]
-				for p, s in components[source.component].parameters:
-					k = [l for l in L if l.component == source.component and l.parameter == p][0]
-					worklist.append(k.value.as_long())
-				components_used.append(components[source.component])
+			source = [l for l in L if l.value.as_long() == cur and l.type == "return"][0]
+			for p, s in components[source.component].parameters:
+				k = [l for l in L if l.component == source.component and l.parameter == p][0]
+				worklist.append(k.value.as_long())
+			components_used.append(components[source.component])
 		left = []
 		while components_used:
 			cur = components_used.pop()

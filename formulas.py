@@ -9,7 +9,7 @@ def group(iter, key_func):
 		result[key_func(value)].append(value)
 	return result
 
-def create_wfp_constraint(L, card_I, N):
+def create_wfp_constraint(L, N):
 	constraints = []
 	# consistency constraint
 	return_locations = [l.value for l in L if l.type == "return"]
@@ -21,12 +21,9 @@ def create_wfp_constraint(L, card_I, N):
 		for parameter in [l.value for l in L if l.type == "parameter" and l.component == comp_id]:
 			constraints.append(parameter < output)
 	# parameter interpretation
-	for output in [l.value for l in L if l.type == "return"]:
-		constraints.append(card_I <= output)
-		constraints.append(output < (N + card_I))
-	for parameter in [l.value for l in L if l.type == "parameter"]:
-		constraints.append(0 <= parameter)
-		constraints.append(parameter < (N + card_I))
+	for p in [l.value for l in L]:
+		constraints.append(0 <= p)
+		constraints.append(p < N)
 	return And(constraints)
 
 def create_lib_constraint(T, I, components):
@@ -42,9 +39,9 @@ def create_lib_constraint(T, I, components):
 		constraints.append(output == component(params, output, Scope(formal_scope)))
 	return And(constraints)
 
-def create_conn_constraint(I, O, T, locations):
+def create_conn_constraint(O, T, locations):
 	constraints = []
-	variables = chain.from_iterable([I, O, T])
+	variables = chain.from_iterable([O, T])
 	for x, y in combinations(variables, 2):
 		x_loc, y_loc = locations[x], locations[y]
 		constraints.append(Implies(x_loc == y_loc, x.value == y.value))
@@ -61,7 +58,14 @@ def create_spec_constraint(I, O, X, constraint):
 
 def create_pattern_constraint(L, components, system):
 	constraints = []
+	system.components = components
 	for l, _ in system.rules:
-		for p in system._invert(l, components):
-			constraints.append(Not(system._pattern(p, L)))
+		for p in system._invert(l):
+			local = []
+			local.append(system._pattern(p, L))
+			eqs = system.extract_equalities(p, L)
+			for k, li in eqs.items():
+				for s, t in combinations(li, 2):
+					local.append(system._eqi(s, t, L))
+			constraints.append(Not(And(local)))
 	return And(constraints)

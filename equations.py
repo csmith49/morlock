@@ -1,7 +1,8 @@
 import terms
 from functools import partial
 from itertools import product
-from z3 import And, Not, simplify
+from z3 import And, Not, simplify, Or
+from collections import defaultdict
 
 class System(object):
 	def __init__(self, sexpr):
@@ -11,6 +12,7 @@ class System(object):
 		self.equations = []
 		self.parse(sexpr)
 		self.match = partial(terms.match, is_variable=self._is_var)
+		self.components = []
 	def _is_var(self, t):
 		if isinstance(t, str):
 			if t.startswith("PARAM."):
@@ -33,10 +35,10 @@ class System(object):
 				self.weights.update(dict(args))
 			else:
 				pass
-	def _invert(self, t, components):
+	def _invert(self, t):
 		if self._is_var(t):
 			yield t
-		for comp_id, c in components.items():
+		for comp_id, c in self.components.items():
 			s = self.match(c.sexpr, t)
 			# if there's no match, we're done
 			if s is None:
@@ -46,7 +48,7 @@ class System(object):
 				yield comp_id
 				continue
 			params = list(sorted(s.keys()))
-			subproblems = [list(self._invert(s[p], components)) for p in params]
+			subproblems = [list(self._invert(s[p])) for p in params]
 			for sol in product(*subproblems):
 				sub = terms.Substitution(dict(list(zip(params, sol))))
 				yield sub([comp_id] + params)
@@ -55,11 +57,7 @@ class System(object):
 		if self._is_var(pattern):
 			return True
 		constraints = [True]
-		# handle the sexpr appropriately
-		if isinstance(pattern, list):
-			f, *args = pattern
-		else:
-			f, args = pattern, []
+		f, *args = breakout(pattern)
 		# now we'll recurse appropriately
 		for i, arg in enumerate(args):
 			constraints.append( self._connect(f, i, arg, L) )
@@ -68,17 +66,46 @@ class System(object):
 	def _connect(self, f, i, t, L):
 		if self._is_var(t):
 			return True
-		if isinstance(t, list):
-			g, *args = t
-		else:
-			g, args = t, []
-		return (get_output(g, L) == get_ith_input(f, i, L))
+		g, *args = breakout(t)
+		return (get_output(g, L).value == get_ith_input(f, i, L).value)
+	def _eqi(self, l, r, L):
+		if l.component == r.component:
+			return True
+		constraints = []
+		for s, t in product([l for l in L if l.type == "return"], repeat=2):
+			constraints.append( And([(l.value == s.value), (r.value == t.value), self._eqo(s, t)]) )
+		return Or(constraints)
+	def _eqo(self, l, r, L):
+		if self.components[l.component].sexpr != self.components[r.component].sexpr:
+			return False
+		constraints = [True]
+		f, g = l.component, r.component
+		arity = len(self.components[f].parameters)
+		for i in range(arity):
+			constraints.append(self._eqi(get_ith_input(f, i, L).value, get_ith_input(g, i, L).value))
+		return And(constraints)
+	def extract_equalities(self, p, L):
+		eqs = defaultdict(list)
+		worklist = [p]
+		while worklist:
+			f, *args = breakout(worklist.pop())
+			for i, arg in enumerate(args):
+				if self._is_var(arg):
+					eqs[arg].append(get_ith_input(f, i, L))
+			worklist += args
+		return eqs
+
+def breakout(term):
+	if isinstance(term, list):
+		return term
+	else:
+		return [term]
 
 # helper functions for accessin our list of location variables appropriately
 def get_output(comp_id, L):
 	possibilities = [l for l in L if l.type == "return" and l.component == comp_id]
-	return possibilities[0].value
+	return possibilities[0]
 
 def get_ith_input(comp_id, i, L):
 	possibilities = [l for l in L if l.parameter == "PARAM.{}".format(i) and l.component == comp_id]
-	return possibilities[0].value
+	return possibilities[0]
