@@ -11,9 +11,13 @@ class System(object):
 		self.rules = []
 		self.equations = []
 		self.parse(sexpr)
+		# once we have our set of variables, we can get the match function for our system
 		self.match = partial(terms.match, is_variable=self._is_var)
 		self.components = []
 	def _is_var(self, t):
+		# a bit of a hack - variables are anything the configuration file says are variables
+		# (which can cause problems if namespaces clash) and anything that we've formatted
+		# like an input variable for our components
 		if isinstance(t, str):
 			if t.startswith("PARAM."):
 				return True
@@ -24,6 +28,7 @@ class System(object):
 		else:
 			return False
 	def parse(self, sexpr):
+		# simple enough, just iterate over sexpr and add the appropriate values
 		for cmd, *args in sexpr:
 			if cmd == "vars":
 				self.variables.update(args)
@@ -36,8 +41,11 @@ class System(object):
 			else:
 				pass
 	def _invert(self, t):
+		# we're working backwards from terms over the rules to terms over components
+		# base case: we can't change variables
 		if self._is_var(t):
 			yield t
+		# for each component, we'll try and find a match
 		for comp_id, c in self.components.items():
 			s = self.match(c.sexpr, t)
 			# if there's no match, we're done
@@ -47,7 +55,9 @@ class System(object):
 			if len(s.keys()) == 0:
 				yield comp_id
 				continue
+			# for each subproblem, choose a solution to get a real value
 			params = list(sorted(s.keys()))
+			# yeah, we should really be caching the results - this is a DP algorithm
 			subproblems = [list(self._invert(s[p])) for p in params]
 			for sol in product(*subproblems):
 				sub = terms.Substitution(dict(list(zip(params, sol))))
@@ -85,6 +95,8 @@ class System(object):
 			constraints.append(self._eqi(get_ith_input(f, i, L).value, get_ith_input(g, i, L).value))
 		return And(constraints)
 	def extract_equalities(self, p, L):
+		# we'll iterate over the term - any time we see a variable, we record the location
+		# this lets us look at the resulting dict to find when we have >= 2 occurrences of a var
 		eqs = defaultdict(list)
 		worklist = [p]
 		while worklist:
@@ -96,10 +108,10 @@ class System(object):
 		return eqs
 
 def breakout(term):
-	if isinstance(term, list):
-		return term
-	else:
-		return [term]
+	# we're doing this anyways in pretty much every instance of recursion
+	# let's us cobble together a pattern-matching deconstruction of terms
+	if isinstance(term, list): return term
+	else: return [term]
 
 # helper functions for accessin our list of location variables appropriately
 def get_output(comp_id, L):
