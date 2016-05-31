@@ -1,0 +1,6 @@
+; these variables need to be distinct from the variables in the sygus file
+(vars X_VAR)
+(rules
+	( (bvand X_VAR X_VAR) X_VAR )
+	( (bvnot (bvnot X_VAR) ) X_VAR )
+)

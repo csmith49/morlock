@@ -1,0 +1,25 @@
+(set-logic LIA)
+
+(synth-fun f ((x Bool) (y Bool)) Bool
+	(
+		(Start Bool
+			(
+				(and Start Start)
+				(and Start Start)
+				(and Start Start)
+				(not Start)
+				(not Start)
+				(not Start)
+				(not Start)
+				x
+				y
+			)
+		)
+	)
+)
+(declare-var a Bool)
+(declare-var b Bool)
+(constraint 
+	(= (f a b) (xor a b))
+)
+(check-synth)
