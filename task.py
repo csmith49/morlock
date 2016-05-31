@@ -56,9 +56,13 @@ class Task(object):
 			components = {}
 			# create components based on breadth:
 			for component in self.synth_function.components:
-				for b in range(breadth):
-					comp_id = "{}.{}".format(component._id, b)
+				if component.is_constant:
+					comp_id = "{}.const".format(component._id)
 					components[comp_id] = component
+				else:
+					for b in range(breadth):
+						comp_id = "{}.{}".format(component._id, b)
+						components[comp_id] = component
 			if DEBUG: 
 				print("Starting synthesis with breadth {}...".format(breadth))
 				print("Components map:")
@@ -85,7 +89,7 @@ class Task(object):
 		initial_constraints = []
 		L = create_location_variables(components)
 		if system:
-			patterns = create_pattern_constraint(L, components, system)
+			patterns = create_pattern_constraints(L, components, system)
 			if DEBUG:
 				print("PATTERNS")
 				print(patterns.sexpr())

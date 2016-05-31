@@ -66,6 +66,10 @@ class Component(object):
 			except:
 				fresh.append( (s, a) )
 		return reconstruct_linearization(fresh)
+	@property
+	def is_constant(self):
+	    return (len(self.parameters) == 0)
+	
 
 class Variable(object):
 	def __init__(self, name, sort):

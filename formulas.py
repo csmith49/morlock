@@ -56,16 +56,5 @@ def create_spec_constraint(I, O, X, constraint):
 		params.append( [v.value for v in variables] )
 	return constraint(X, list(zip(params, outputs)))
 
-def create_pattern_constraint(L, components, system):
-	constraints = []
-	system.components = components
-	for l, _ in system.rules:
-		for p in system._invert(l):
-			local = []
-			local.append(system._pattern(p, L))
-			eqs = system.extract_equalities(p, L)
-			for k, li in eqs.items():
-				for s, t in combinations(li, 2):
-					local.append(system._eqi(s, t, L))
-			constraints.append(Not(And(local)))
-	return And(constraints)
+def create_pattern_constraints(L, components, system):
+	return system.constrain(L, components)

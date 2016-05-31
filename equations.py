@@ -1,8 +1,10 @@
 import terms
 from functools import partial
 from itertools import product
-from z3 import And, Not, simplify, Or
+from z3 import And, Not, simplify, Or, BoolSort, Const
 from collections import defaultdict
+from itertools import combinations, permutations
+from setup import DEBUG
 
 class System(object):
 	def __init__(self, sexpr):
@@ -78,23 +80,26 @@ class System(object):
 			return True
 		g, *args = breakout(t)
 		return (get_output(g, L).value == get_ith_input(f, i, L).value)
-	def _eqi(self, l, r, L):
-		if l.component == r.component:
-			return True
+	def _constrain_eq_vars(self, E, L):
 		constraints = []
-		for s, t in product([l for l in L if l.type == "return"], repeat=2):
-			constraints.append( And([(l.value == s.value), (r.value == t.value), self._eqo(s, t)]) )
-		return Or(constraints)
-	def _eqo(self, l, r, L):
-		if self.components[l.component].sexpr != self.components[r.component].sexpr:
-			return False
-		constraints = [True]
-		f, g = l.component, r.component
-		arity = len(self.components[f].parameters)
-		for i in range(arity):
-			constraints.append(self._eqi(get_ith_input(f, i, L).value, get_ith_input(g, i, L).value))
-		return And(constraints)
-	def extract_equalities(self, p, L):
+		for l, r in combinations(L, 2):
+			if l.type == "return" and r.type == "return":
+				lcomp, rcomp = self.components[l.component], self.components[r.component]
+				if lcomp.sexpr != rcomp.sexpr:
+					constraints.append( E[(l, r)] == False )
+				else:
+					local = [True]
+					for i in range(len(lcomp.parameters)):
+						li, ri = get_ith_input(l.component, i, L), get_ith_input(r.component, i, L)
+						local.append( E[(li, ri)] )
+					constraints.append( E[(l, r)] == And(local) )
+			elif l.type == "parameter" and r.type == "parameter": # type is parameter
+				local = [(l.value == r.value)]
+				for f, g in permutations([get_output(c, L) for c, _ in self.components.items()], 2):
+					local.append( And([l.value == f.value, r.value == g.value, E[(f, g)]]) )
+				constraints.append( E[(l, r)] == Or(local) )
+		return simplify(And(constraints))
+	def _extract_equalities(self, p, L):
 		# we'll iterate over the term - any time we see a variable, we record the location
 		# this lets us look at the resulting dict to find when we have >= 2 occurrences of a var
 		eqs = defaultdict(list)
@@ -106,6 +111,49 @@ class System(object):
 					eqs[arg].append(get_ith_input(f, i, L))
 			worklist += args
 		return eqs
+	def constrain(self, L, components):
+		constraints = []
+		# for scoping issues
+		self.components = components
+		# get eq variables
+		E = EqMap()
+		if DEBUG: print(E)
+		constraints.append(self._constrain_eq_vars(E, L))
+		# now get all patterns and do the thing
+		for l, _ in self.rules:
+			for p in self._invert(l):
+				local = []
+				local.append(self._pattern(p, L))
+				eqs = self._extract_equalities(p, L)
+				# add eq constraints from pattern
+				for k, li in eqs.items():
+					for s, t in combinations(li, 2):
+						local.append( E[(s, t)] )
+				constraints.append( Not(And(local)) )
+		return And(constraints)
+
+class EqMap(object):
+	def __init__(self):
+		self._dict = {}
+	def _key(self, l):
+		return "{}.{}".format(l.component, l.parameter)
+	def _norm(self, l, r):
+		if self._key(l) <= self._key(r): return (l, r)
+		else: return (r, l)
+	def __getitem__(self, key):
+		l, r = self._norm(*key)
+		if l.type != r.type:
+			return False
+		elif self._key(l) == self._key(r):
+			return True
+		else:
+			k = (self._key(l), self._key(r))
+			if k not in self._dict.keys():
+				c_id = "eq.{}".format(k)
+				self._dict[k] = Const(c_id, BoolSort())
+			return self._dict[k]
+	def __repr__(self):
+		return repr(self._dict.keys())
 
 def breakout(term):
 	# we're doing this anyways in pretty much every instance of recursion

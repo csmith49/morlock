@@ -1,6 +1,7 @@
 from collections import namedtuple
-from z3 import Int, Const, IntSort
+from z3 import Int, Const, IntSort, BoolSort
 from scope import get_sort
+from itertools import combinations
 
 Location = namedtuple("Location", "type parameter component value")
 Input = namedtuple("Input", "example width parameter value")
@@ -58,5 +59,3 @@ def create_location_map(O, T, L, N):
 	for t in T:
 		locations[t] = [l.value for l in L if l.component == t.component and l.parameter == t.parameter][0]
 	return locations
-
-
