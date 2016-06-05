@@ -1,0 +1,8 @@
+(VAR u v w x y z)
+(RULES
+concat(leaf,y) -> y
+concat(cons(u,v),y) -> cons(u,concat(v,y))
+less_leaves(x,leaf) -> false
+less_leaves(leaf,cons(w,z)) -> true
+less_leaves(cons(u,v),cons(w,z)) -> less_leaves(concat(u,v),concat(w,z))
+)

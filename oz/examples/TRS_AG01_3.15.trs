@@ -1,0 +1,7 @@
+(VAR x y)
+(RULES
+average(s(x),y) -> average(x,s(y))
+average(x,s(s(s(y)))) -> s(average(s(x),y))
+average(0,0) -> 0
+average(0,s(0)) -> 0
+average(0,s(s(0))) -> s(0))

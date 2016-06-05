@@ -1,0 +1,4 @@
+(VAR x y z)
+(RULES
+ .(.(x,y),z) -> .(x,.(y,z))
+)

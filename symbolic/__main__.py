@@ -2,7 +2,7 @@ from time import clock
 from pprint import pprint
 from setup import DEBUG, FILENAME, load_file, EQ_FILENAME
 from task import Task
-from equations import System
+from embedding import System
 
 if __name__ == "__main__":
 	# record starting time for bm purposes

@@ -69,6 +69,9 @@ class Component(object):
 	@property
 	def is_constant(self):
 	    return (len(self.parameters) == 0)
+	@property
+	def arity(self):
+		return len(self.parameters)
 	
 
 class Variable(object):

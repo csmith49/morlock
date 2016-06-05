@@ -1,0 +1,12 @@
+# Oz - the man behind the curtain
+
+### Usage
+As a module: `from oz import parse_tpdb, check_termination`
+
+As a script: `python3 oz /path/to/file`
+
+### Dependencies
+Oz uses Python 3.4, pyparsing, and z3.
+
+### Test Cases
+All test cases are taken from the benchmarks on (KBO Orientability)[http://colo6-c703.uibk.ac.at/ttt2/hz/kbo//index.php].

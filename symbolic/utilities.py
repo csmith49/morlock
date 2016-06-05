@@ -59,3 +59,18 @@ def unique(iterable, key=None):
             if k not in seen:
                 seen_add(k)
                 yield element
+
+def div(x, y):
+	return (x - (x % y)) / y
+
+def breakout(term):
+	if isinstance(term, list): return term
+	else: return [term]
+
+def get_output(comp_id, L):
+	poss = [l for l in L if l.type == "return" and l.component == comp_id]
+	return poss[0]
+
+def get_ith_input(comp_id, i, L):
+	poss = [l for l in L if l.parameter == "PARAM.{}".format(i) and l.component == comp_id]
+	return poss[0]

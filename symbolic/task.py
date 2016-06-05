@@ -90,9 +90,6 @@ class Task(object):
 		L = create_location_variables(components)
 		if system:
 			patterns = create_pattern_constraints(L, components, system)
-			if DEBUG:
-				print("PATTERNS")
-				print(patterns.sexpr())
 			initial_constraints.append(patterns)
 		wfp = create_wfp_constraint(L, N)
 		initial_constraints.append(wfp)
